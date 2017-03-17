@@ -57,11 +57,11 @@ See `https://github.com/alexmurray/coverity/'."
             "--text-output-style=oneline"
             (eval flycheck-coverity-args)
             source-original)
-  :error-patterns ((info line-start (file-name) ":" line ": CID"
-                         (message (one-or-more not-newline)
-                                  (zero-or-more "\n"
-                                                (one-or-more not-newline)))
-                         line-end))
+  :error-patterns ((warning line-start (file-name) ":" line ": CID"
+                            (message (one-or-more not-newline)
+                                     (zero-or-more "\n"
+                                                   (one-or-more not-newline)))
+                            line-end))
   :modes (c-mode c++-mode))
 
 ;;;###autoload
