@@ -57,11 +57,34 @@
     (-when-let (root (locate-dominating-file file "coverity.conf"))
       (concat (file-name-as-directory root) "coverity.conf"))))
 
+(defun flycheck-coverity--locate-data-coverity ()
+  "Locate the data-coverity directory."
+  (-when-let (conf (flycheck-coverity--locate-coverity-conf))
+    (let ((data-coverity (concat (file-name-as-directory (f-dirname conf)) "data-coverity")))
+      (when (file-exists-p data-coverity)
+	data-coverity))))
+
+(defun flycheck-coverity--locate-build-log ()
+  "Locate the data-coverity directory."
+  (-when-let (conf (flycheck-coverity--locate-coverity-conf))
+    (let ((data-coverity (concat (file-name-as-directory (f-dirname conf)) "data-coverity")))
+      (first (file-expand-wildcards (concat (file-name-as-directory data-coverity)
+					    (file-name-as-directory "*")
+					    (file-name-as-directory "idir")
+					    "build-log.txt"))))))
+
 (defun flycheck-coverity--setup-p ()
   "Determine if `cov-run-desktop --setup` has been run by the presence of data-coverity directory."
-  (-when-let (conf (flycheck-coverity--locate-coverity-conf))
-    (file-exists-p (concat (file-name-as-directory (f-dirname conf))
-			   "data-coverity"))))
+  (-when-let (build-log (flycheck-coverity--locate-build-log))
+    (let ((file (buffer-file-name)))
+      ;; use grep if available otherwise fall back to searching directly in
+      ;; emacs-lisp - slower but available on all platforms
+      (-if-let (grep (executable-find "grep"))
+	  (= 0 (shell-command (concat "grep -q " file " " build-log)))
+	(let ((large-file-warning-threshold nil))
+	  (with-current-buffer (find-file-noselect build-log)
+	    (goto-char (point-min))
+	    (search-forward file (point-max) t)))))))
 
 (flycheck-define-checker coverity
   "A checker using coverity.
@@ -74,21 +97,34 @@ See `https://github.com/alexmurray/coverity/'."
   :predicate (lambda () (and (flycheck-buffer-saved-p)
 			(flycheck-coverity--setup-p)))
   :verify (lambda (_)
-	    (let ((conf (flycheck-coverity--locate-coverity-conf))
+	    (let ((file (buffer-file-name))
+		  (conf (flycheck-coverity--locate-coverity-conf))
+		  (data-coverity (flycheck-coverity--locate-data-coverity))
+		  (build-log (flycheck-coverity--locate-build-log))
 		  (setup (flycheck-coverity--setup-p)))
 	      (list
 	       (flycheck-verification-result-new
 		:label "coverity.conf"
-		:message (if conf conf "no coverity.conf found")
+		:message (if conf (format "Found at %s" conf) "no coverity.conf found")
 		:face (if conf
 			  'success
 			'(bold error)))
 	       (flycheck-verification-result-new
 		:label "cov-run-desktop --setup"
-		:message (if setup "Done" "Please run `cov-run-desktop --setup`")
+		:message (if data-coverity "Yes" "No - please run `cov-run-desktop --setup`")
+		:face (if data-coverity
+			  'success
+			'(bold error)))
+	       (flycheck-verification-result-new
+		:label "In Project"
+		:message (if setup
+			     "Yes"
+			   (format "%s does not seem to mention this file (%s)"
+				   build-log file))
 		:face (if setup
 			  'success
 			'(bold error))))))
+
   :error-patterns ((warning line-start (file-name) ":" line ": CID"
                             (message (one-or-more not-newline)
                                      (zero-or-more "\n"
