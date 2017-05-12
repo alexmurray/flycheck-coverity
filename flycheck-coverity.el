@@ -46,8 +46,14 @@
 
 ;;; Code:
 (require 'flycheck)
+(require 'dash)
 
 (flycheck-def-args-var flycheck-coverity-args coverity)
+
+(defun flycheck-coverity-locate-coverity-conf ()
+  "Locate the coverity.conf file."
+  (-when-let (file (buffer-file-name))
+    (locate-dominating-file file "coverity.conf")))
 
 (flycheck-define-checker coverity
   "A checker using coverity.
@@ -57,6 +63,8 @@ See `https://github.com/alexmurray/coverity/'."
             "--text-output-style=oneline"
             (eval flycheck-coverity-args)
             source-original)
+  :predicate (lambda () (and flycheck-buffer-saved-p
+			(flycheck-coverity-locate-coverity-conf)))
   :error-patterns ((warning line-start (file-name) ":" line ": CID"
                             (message (one-or-more not-newline)
                                      (zero-or-more "\n"
