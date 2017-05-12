@@ -47,13 +47,21 @@
 ;;; Code:
 (require 'flycheck)
 (require 'dash)
+(require 'f)
 
 (flycheck-def-args-var flycheck-coverity-args coverity)
 
-(defun flycheck-coverity-locate-coverity-conf ()
+(defun flycheck-coverity--locate-coverity-conf ()
   "Locate the coverity.conf file."
   (-when-let (file (buffer-file-name))
-    (locate-dominating-file file "coverity.conf")))
+    (-when-let (root (locate-dominating-file file "coverity.conf"))
+      (concat (file-name-as-directory root) "coverity.conf"))))
+
+(defun flycheck-coverity--setup-p ()
+  "Determine if `cov-run-desktop --setup` has been run by the presence of data-coverity directory."
+  (-when-let (conf (flycheck-coverity--locate-coverity-conf))
+    (file-exists-p (concat (file-name-as-directory (f-dirname conf))
+			   "data-coverity"))))
 
 (flycheck-define-checker coverity
   "A checker using coverity.
@@ -63,8 +71,24 @@ See `https://github.com/alexmurray/coverity/'."
             "--text-output-style=oneline"
             (eval flycheck-coverity-args)
             source-original)
-  :predicate (lambda () (and flycheck-buffer-saved-p
-			(flycheck-coverity-locate-coverity-conf)))
+  :predicate (lambda () (and (flycheck-buffer-saved-p)
+			(flycheck-coverity--setup-p)))
+  :verify (lambda (_)
+	    (let ((conf (flycheck-coverity--locate-coverity-conf))
+		  (setup (flycheck-coverity--setup-p)))
+	      (list
+	       (flycheck-verification-result-new
+		:label "coverity.conf"
+		:message (if conf conf "no coverity.conf found")
+		:face (if conf
+			  'success
+			'(bold error)))
+	       (flycheck-verification-result-new
+		:label "cov-run-desktop --setup"
+		:message (if setup "Done" "Please run `cov-run-desktop --setup`")
+		:face (if setup
+			  'success
+			'(bold error))))))
   :error-patterns ((warning line-start (file-name) ":" line ": CID"
                             (message (one-or-more not-newline)
                                      (zero-or-more "\n"
