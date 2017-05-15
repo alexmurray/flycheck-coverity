@@ -11,7 +11,7 @@ check for defects in your code on-the-fly.
 
 ## Installation
 
-### MELPA
+### MELPA (coming soon...)
 
 The preferred way to install `flycheck-coverity` is via
 [MELPA](http://melpa.org) - then you can just <kbd>M-x package-install RET
