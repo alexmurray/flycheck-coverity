@@ -47,40 +47,52 @@
 ;;; Code:
 (require 'flycheck)
 (require 'dash)
-(require 'f)
 
 (flycheck-def-args-var flycheck-coverity-args coverity)
 
+(defun flycheck-coverity--get-default-directory (_checker)
+  "Get the working directory."
+  (-when-let (file (buffer-file-name))
+    (locate-dominating-file file "coverity.conf")))
+
+(defun flycheck-coverity--get-relative-buffer-file-name ()
+  "Get the relative path name for the current (buffer-file-name)."
+  (file-relative-name (buffer-file-name)
+		      (flycheck-coverity--get-default-directory nil)))
+
 (defun flycheck-coverity--locate-coverity-conf ()
   "Locate the coverity.conf file."
-  (-when-let (file (buffer-file-name))
-    (-when-let (root (locate-dominating-file file "coverity.conf"))
-      (concat (file-name-as-directory root) "coverity.conf"))))
+  (-when-let (root (flycheck-coverity--get-default-directory nil))
+    (concat (file-name-as-directory root) "coverity.conf")))
 
 (defun flycheck-coverity--locate-data-coverity ()
   "Locate the data-coverity directory."
   (-when-let (conf (flycheck-coverity--locate-coverity-conf))
-    (let ((data-coverity (concat (file-name-as-directory (f-dirname conf)) "data-coverity")))
+    (let ((data-coverity (expand-file-name
+			  (concat (file-name-as-directory
+				   (file-name-directory conf))
+				  "data-coverity"))))
       (when (file-exists-p data-coverity)
 	data-coverity))))
 
 (defun flycheck-coverity--locate-build-log ()
   "Locate the data-coverity directory."
-  (-when-let (conf (flycheck-coverity--locate-coverity-conf))
-    (let ((data-coverity (concat (file-name-as-directory (f-dirname conf)) "data-coverity")))
-      (first (file-expand-wildcards (concat (file-name-as-directory data-coverity)
-					    (file-name-as-directory "*")
-					    (file-name-as-directory "idir")
-					    "build-log.txt"))))))
+  (-when-let (data-coverity (flycheck-coverity--locate-data-coverity))
+    (first (file-expand-wildcards (concat (file-name-as-directory data-coverity)
+					  (file-name-as-directory "*")
+					  (file-name-as-directory "idir")
+					  "build-log.txt")))))
 
 (defun flycheck-coverity--setup-p ()
   "Determine if `cov-run-desktop --setup` has been run by the presence of data-coverity directory."
   (-when-let (build-log (flycheck-coverity--locate-build-log))
-    (let ((file (buffer-file-name)))
+    (let ((file (flycheck-coverity--get-relative-buffer-file-name)))
       ;; use grep if available otherwise fall back to searching directly in
       ;; emacs-lisp - slower but available on all platforms
       (-if-let (grep (executable-find "grep"))
-	  (= 0 (call-process grep nil nil nil "-q" file build-log))
+	  (progn
+	    (message "searching for %s in %s" file build-log)
+	    (= 0 (call-process grep nil nil nil "-q" file build-log)))
 	(let ((large-file-warning-threshold nil))
 	  (with-current-buffer (find-file-noselect build-log)
 	    (goto-char (point-min))
@@ -96,8 +108,9 @@ See `https://github.com/alexmurray/coverity/'."
             source-original)
   :predicate (lambda () (and (flycheck-buffer-saved-p)
 			(flycheck-coverity--setup-p)))
+  :working-directory flycheck-coverity--get-default-directory
   :verify (lambda (_)
-	    (let ((file (buffer-file-name))
+	    (let ((file (flycheck-coverity--get-relative-buffer-file-name))
 		  (conf (flycheck-coverity--locate-coverity-conf))
 		  (data-coverity (flycheck-coverity--locate-data-coverity))
 		  (build-log (flycheck-coverity--locate-build-log))
