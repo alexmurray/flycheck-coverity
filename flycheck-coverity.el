@@ -90,9 +90,7 @@
       ;; use grep if available otherwise fall back to searching directly in
       ;; emacs-lisp - slower but available on all platforms
       (-if-let (grep (executable-find "grep"))
-	  (progn
-	    (message "searching for %s in %s" file build-log)
-	    (= 0 (call-process grep nil nil nil "-q" file build-log)))
+	  (= 0 (call-process grep nil nil nil "-q" file build-log))
 	(let ((large-file-warning-threshold nil))
 	  (with-current-buffer (find-file-noselect build-log)
 	    (goto-char (point-min))
