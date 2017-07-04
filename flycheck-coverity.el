@@ -5,7 +5,7 @@
 ;; Author: Alex Murray <murray.alex@gmail.com>
 ;; Maintainer: Alex Murray <murray.alex@gmail.com>
 ;; URL: https://github.com/alexmurray/flycheck-coverity
-;; Version: 0.1
+;; Version: 0.2
 ;; Package-Requires: ((flycheck "0.24") (dash "2.12.0") (emacs "24.4"))
 
 ;; This file is not part of GNU Emacs.
