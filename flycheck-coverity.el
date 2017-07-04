@@ -46,6 +46,7 @@
 ;;; Code:
 (require 'flycheck)
 (require 'dash)
+(require 'cl-lib)
 
 (flycheck-def-args-var flycheck-coverity-args coverity)
 
@@ -77,10 +78,10 @@
 (defun flycheck-coverity--locate-build-log ()
   "Locate the data-coverity directory."
   (-when-let (data-coverity (flycheck-coverity--locate-data-coverity))
-    (first (file-expand-wildcards (concat (file-name-as-directory data-coverity)
-					  (file-name-as-directory "*")
-					  (file-name-as-directory "idir")
-					  "build-log.txt")))))
+    (cl-first (file-expand-wildcards (concat (file-name-as-directory data-coverity)
+                                             (file-name-as-directory "*")
+                                             (file-name-as-directory "idir")
+                                             "build-log.txt")))))
 
 (defun flycheck-coverity--setup-p ()
   "Determine if `cov-run-desktop --setup` has been run by the presence of data-coverity directory."
